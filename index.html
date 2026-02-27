@@ -1,0 +1,439 @@
+﻿<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dzinia | Pricing Plans</title>
+  <meta name="description" content="Dzinia Designing Services — premium graphic design pricing for every need." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- gradient orbs -->
+  <div class="orb orb-1" aria-hidden="true"></div>
+  <div class="orb orb-2" aria-hidden="true"></div>
+  <div class="orb orb-3" aria-hidden="true"></div>
+
+  <div class="app-wrap">
+
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="header-top">
+        <img src="assets/logo.png" alt="Dzinia" class="hdr-logo" />
+        <div class="header-dots" id="categoryDots" aria-hidden="true"></div>
+      </div>
+      <span class="badge-tag">Pricing Plan</span>
+      <h1 class="headline">All Services.<br />Every Budget.</h1>
+      <p class="sub-headline" id="sourceInfo">Loading services&hellip;</p>
+      <div class="quick-cats" id="quickCats"></div>
+    </header>
+
+    <!-- CATEGORY TABS -->
+    <div class="tab-strip-wrap">
+      <div class="tab-strip" id="tabStrip" role="tablist" aria-label="Service categories"></div>
+    </div>
+
+    <!-- SERVICE CARDS -->
+    <div class="services-stage" id="servicesStage"></div>
+
+    <!-- QUOTE DRAWER -->
+    <section class="quote-drawer" id="quoteDrawer" aria-label="Quotation">
+      <div class="quote-drawer-head">
+        <div>
+          <p class="drawer-label">Your Quotation</p>
+          <p class="drawer-count" id="quoteCount">0 services added</p>
+        </div>
+        <div class="drawer-actions">
+          <button id="clearQuoteBtn" class="btn-outline-sm" type="button">Clear</button>
+          <button id="printQuoteBtn" class="btn-pill btn-print" type="button">
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 6V2h10v4M3 11H1V6h14v5h-2M3 11v3h10v-3" stroke="currentColor" stroke-width="1.5"
+                stroke-linejoin="round" />
+            </svg>
+            Download PDF
+          </button>
+        </div>
+      </div>
+      <div class="quote-list" id="quoteList">
+        <p class="quote-empty">Add services using the cards above.</p>
+      </div>
+      <div class="quote-totals" id="quoteTotals" style="display:none">
+        <div class="total-row"><span>Subtotal</span><span id="quoteSubtotal" class="mono">—</span></div>
+        <div class="total-row"><span>GST (18%)</span><span id="quoteGST" class="mono muted">—</span></div>
+        <div class="total-row grand"><span>Grand Total</span><span id="quoteGrand" class="mono accent-text">—</span>
+        </div>
+      </div>
+    </section>
+
+    <footer class="app-footer">
+      <p>&copy; 2025 Dzinia Designing Services &nbsp;&middot;&nbsp;
+        <a href="https://dzinia.in" target="_blank" rel="noopener">dzinia.in</a>
+        &nbsp;&middot;&nbsp; Pune, India
+      </p>
+    </footer>
+  </div>
+
+  <script src="services-data.js"></script>
+  <script src="script.js"></script>
+  <script>
+    /* =============================================================
+       VOLUME PRICING ENGINE
+       Tier size : 10 units
+       Discount  : 0% for 1-10, 12% for 11-20, 24% for 21-30 ...
+       Cap       : 50% maximum discount
+    ============================================================= */
+    const TIER_SIZE = 10;
+    const DISC_STEP = 12;   // % extra per tier after first
+    const MAX_DISC = 50;   // % hard cap
+
+    function calcVolume(unitPrice, qty) {
+      const tiers = [];
+      let remaining = qty, tierIdx = 0, total = 0;
+      while (remaining > 0) {
+        const tierQty = Math.min(remaining, TIER_SIZE);
+        const disc = Math.min(tierIdx * DISC_STEP, MAX_DISC);
+        const tierUnit = unitPrice * (1 - disc / 100);
+        const sub = tierUnit * tierQty;
+        const from = qty - remaining + 1;
+        tiers.push({ from, to: from + tierQty - 1, qty: tierQty, discountPct: disc, unitPrice: tierUnit, subtotal: sub });
+        total += sub; remaining -= tierQty; tierIdx++;
+      }
+      return { total, effectiveUnit: total / qty, tiers };
+    }
+
+    /* ── Helpers ── */
+    const inrFmt = v => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    let quoteItems = [];
+    let activeCategory = '';
+
+    const cat_icons = {
+      "Branding & Identity": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`,
+      "Social Media": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>`,
+      "Print Design": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="8" width="18" height="10" rx="2"/><path d="M7 8V5a2 2 0 012-2h6a2 2 0 012 2v3M7 15h.01M7 18h10"/></svg>`,
+      "Packaging Design": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 8l-9-4-9 4v8l9 4 9-4V8z"/><path d="M12 4v16M3 8l9 4 9-4"/></svg>`,
+      "Digital & Web": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 20h8M12 18v2"/></svg>`,
+      "Motion & Video": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+      "Photo & Illustration": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`,
+      "Merchandise & Promo": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`,
+    };
+
+    /* ── Boot ── */
+    document.addEventListener('DOMContentLoaded', () => setTimeout(initCustomUI, 120));
+
+    function initCustomUI() {
+      const data = window.SERVICES_DATA;
+      if (!data || !data.services) { document.getElementById('sourceInfo').textContent = 'Could not load services.'; return; }
+      document.getElementById('sourceInfo').textContent =
+        data.services.length + ' services · volume discounts applied automatically';
+      const sections = [...new Set(data.services.map(s => s.section))];
+      activeCategory = sections[0];
+      buildQuickCats(sections);
+      buildTabs(sections);
+      buildDots(sections);
+      renderServiceCards(data.services, activeCategory);
+    }
+
+    function buildDots(sections) {
+      document.getElementById('categoryDots').innerHTML =
+        sections.map((s, i) => '<span class="dot ' + (i === 0 ? 'dot-active' : '') + '" data-cat="' + esc(s) + '"></span>').join('');
+    }
+    function updateDots(cat) {
+      document.querySelectorAll('.dot').forEach(d => d.classList.toggle('dot-active', d.dataset.cat === cat));
+    }
+
+    function buildQuickCats(sections) {
+      const el = document.getElementById('quickCats');
+      el.innerHTML = sections.slice(0, 4).map(cat =>
+        '<button class="quick-cat-btn" data-cat="' + esc(cat) + '" title="' + esc(cat) + '" aria-label="' + esc(cat) + '">' +
+        '<span class="qcat-icon">' + (cat_icons[cat] || cat_icons['Digital & Web']) + '</span>' +
+        '<span class="qcat-label">' + cat.split(' ')[0] + '</span></button>'
+      ).join('');
+      el.querySelectorAll('.quick-cat-btn').forEach(b => b.addEventListener('click', () => switchCategory(b.dataset.cat)));
+    }
+
+    function buildTabs(sections) {
+      const strip = document.getElementById('tabStrip');
+      strip.innerHTML = sections.map((cat, i) =>
+        '<button class="tab-btn ' + (i === 0 ? 'tab-active' : '') + '" role="tab" aria-selected="' + (i === 0) + '" data-cat="' + esc(cat) + '">' +
+        cat.split(' ')[0] + '</button>'
+      ).join('');
+      strip.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchCategory(b.dataset.cat)));
+    }
+
+    function switchCategory(cat) {
+      activeCategory = cat;
+      document.querySelectorAll('.tab-btn').forEach(b => { b.classList.toggle('tab-active', b.dataset.cat === cat); b.setAttribute('aria-selected', b.dataset.cat === cat); });
+      document.querySelectorAll('.quick-cat-btn').forEach(b => b.classList.toggle('qcat-active', b.dataset.cat === cat));
+      updateDots(cat);
+      renderServiceCards(window.SERVICES_DATA.services, cat);
+    }
+
+    /* ── Render cards ── */
+    function renderServiceCards(services, cat) {
+      const stage = document.getElementById('servicesStage');
+      const catServices = services.filter(s => s.section === cat);
+
+      stage.innerHTML = catServices.map(svc => {
+        const hasPrice = typeof svc.base_price === 'number' && isFinite(svc.base_price);
+        const priceStr = hasPrice ? inrFmt(svc.base_price) : 'On Request';
+
+        return '<div class="service-card" data-id="' + esc(svc.id) + '">' +
+
+          // TOP
+          '<div class="sc-top">' +
+          '<div class="sc-info"><h2 class="sc-name">' + esc(svc.service) + '</h2>' +
+          '<p class="sc-scope">' + esc(svc.scope) + '</p></div>' +
+          '<div class="sc-price-block"><p class="sc-price' + (!hasPrice ? ' sc-price-na' : '') + '">' + priceStr + '</p>' +
+          (hasPrice ? '<p class="sc-unit">' + esc(svc.unit) + '</p>' : '') + '</div>' +
+          '</div>' +
+
+          // TIERS HINT + QTY ROW (priced services only)
+          (hasPrice ?
+            '<div class="sc-price-detail">' +
+            '<span class="sc-detail-item"><span class="dot-sm"></span>Qty 1–10: Full rate</span>' +
+            '<span class="sc-detail-item"><span class="dot-sm"></span>Qty 11–20: −12%</span>' +
+            '<span class="sc-detail-item"><span class="dot-sm"></span>Qty 21–30: −24%</span>' +
+            '<span class="sc-detail-item accent-detail"><span class="dot-sm accent-dot"></span>Max −50% at qty 50+</span>' +
+            '</div>' +
+
+            // Qty stepper + live total
+            '<div class="sc-qty-row">' +
+            '<div class="sc-qty-wrap">' +
+            '<label class="sc-qty-label" for="qty-' + esc(svc.id) + '">Quantity</label>' +
+            '<div class="qty-stepper">' +
+            '<button type="button" class="qs-btn qs-minus" data-id="' + esc(svc.id) + '" aria-label="Decrease">&#8722;</button>' +
+            '<input id="qty-' + esc(svc.id) + '" class="qs-input" type="number" min="1" step="1" value="1" data-id="' + esc(svc.id) + '" />' +
+            '<button type="button" class="qs-btn qs-plus" data-id="' + esc(svc.id) + '" aria-label="Increase">+</button>' +
+            '</div>' +
+            '</div>' +
+            '<div class="sc-live-total">' +
+            '<span class="slt-label">Total</span>' +
+            '<span class="slt-value" id="live-' + esc(svc.id) + '">' + inrFmt(svc.base_price) + '</span>' +
+            '</div>' +
+            '</div>' +
+
+            // Tier breakdown (hidden until qty > 10)
+            '<div class="tier-breakdown" id="tiers-' + esc(svc.id) + '" style="display:none">' +
+            '<p class="tb-head">Volume discount breakdown</p>' +
+            '<div class="tb-body" id="tb-' + esc(svc.id) + '"></div>' +
+            '</div>'
+            :
+            '<div class="sc-price-detail"><span class="sc-detail-item"><span class="dot-sm"></span>Price set on scope discussion</span></div>'
+          ) +
+
+          // FOOTER
+          '<div class="sc-footer">' +
+          '<a href="https://api.whatsapp.com/send?phone=09503495511" target="_blank" rel="noopener" class="sc-custom-link" aria-label="Custom request">' +
+          '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M5 11L11 5M11 5H6M11 5v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>' +
+          'Custom Request</a>' +
+          (hasPrice ?
+            '<button class="btn-pill btn-add" data-id="' + esc(svc.id) + '" type="button" aria-label="Add ' + esc(svc.service) + ' to quote">' +
+            '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' +
+            'Add to Quote</button>' : '') +
+          '</div>' +
+          '</div>';
+      }).join('');
+
+      // Events
+      stage.querySelectorAll('.qs-input').forEach(inp => inp.addEventListener('input', () => refreshLiveTotal(inp.dataset.id)));
+      stage.querySelectorAll('.qs-minus').forEach(b => b.addEventListener('click', () => {
+        const inp = document.getElementById('qty-' + b.dataset.id);
+        inp.value = Math.max(1, Number(inp.value) - 1);
+        refreshLiveTotal(b.dataset.id);
+      }));
+      stage.querySelectorAll('.qs-plus').forEach(b => b.addEventListener('click', () => {
+        const inp = document.getElementById('qty-' + b.dataset.id);
+        inp.value = Number(inp.value) + 1;
+        refreshLiveTotal(b.dataset.id);
+      }));
+      stage.querySelectorAll('.btn-add').forEach(btn => btn.addEventListener('click', () => addServiceToQuote(btn.dataset.id)));
+
+      // Animate
+      requestAnimationFrame(() => {
+        stage.querySelectorAll('.service-card').forEach((c, i) => {
+          c.style.animationDelay = (i * 0.04) + 's';
+          c.classList.add('card-enter');
+        });
+      });
+
+      // Init live totals
+      catServices.forEach(svc => { if (typeof svc.base_price === 'number') refreshLiveTotal(svc.id); });
+    }
+
+    /* ── Live total + breakdown ── */
+    function refreshLiveTotal(svcId) {
+      const svc = window.SERVICES_DATA.services.find(s => s.id === svcId);
+      if (!svc || typeof svc.base_price !== 'number') return;
+      const inp = document.getElementById('qty-' + svcId);
+      if (!inp) return;
+      const qty = Math.max(1, Number(inp.value) || 1);
+      inp.value = qty;
+      const { total, tiers } = calcVolume(svc.base_price, qty);
+
+      const liveEl = document.getElementById('live-' + svcId);
+      if (liveEl) liveEl.textContent = inrFmt(total);
+
+      const tiersWrap = document.getElementById('tiers-' + svcId);
+      const tbBody = document.getElementById('tb-' + svcId);
+      if (!tiersWrap || !tbBody) return;
+
+      if (qty > TIER_SIZE) {
+        tiersWrap.style.display = 'block';
+        tbBody.innerHTML = tiers.map(t =>
+          '<div class="tb-row">' +
+          '<span class="tb-range">Qty ' + t.from + '&ndash;' + t.to + '</span>' +
+          '<span class="tb-disc ' + (t.discountPct ? 'tb-disc-on' : '') + '">' + (t.discountPct ? '&#8722;' + t.discountPct + '%' : 'Full price') + '</span>' +
+          '<span class="tb-unit">' + inrFmt(t.unitPrice) + '/unit</span>' +
+          '<span class="tb-sub">' + inrFmt(t.subtotal) + '</span>' +
+          '</div>'
+        ).join('');
+      } else {
+        tiersWrap.style.display = 'none';
+      }
+    }
+
+    /* ── Add to quote ── */
+    function addServiceToQuote(svcId) {
+      const svc = window.SERVICES_DATA.services.find(s => s.id === svcId);
+      if (!svc || typeof svc.base_price !== 'number') return;
+      const inp = document.getElementById('qty-' + svcId);
+      const qty = inp ? Math.max(1, Number(inp.value) || 1) : 1;
+      const { total, effectiveUnit, tiers } = calcVolume(svc.base_price, qty);
+      const existing = quoteItems.find(i => i.id === svcId);
+      if (existing) {
+        Object.assign(existing, { qty, tieredTotal: total, effectiveUnit, tiers });
+      } else {
+        quoteItems.push({
+          id: svc.id, section: svc.section, service: svc.service, unit: svc.unit,
+          baseUnitPrice: svc.base_price, qty, tieredTotal: total, effectiveUnit, tiers
+        });
+      }
+      renderQuoteDrawer();
+
+      // Flash button
+      const btn = document.querySelector('.btn-add[data-id="' + svcId + '"]');
+      if (btn) {
+        btn.textContent = 'Added!';
+        btn.classList.add('btn-added');
+        setTimeout(() => {
+          btn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg> Add to Quote';
+          btn.classList.remove('btn-added');
+        }, 1500);
+      }
+    }
+
+    /* ── Quote drawer ── */
+    function renderQuoteDrawer() {
+      const list = document.getElementById('quoteList');
+      const totalsEl = document.getElementById('quoteTotals');
+      const countEl = document.getElementById('quoteCount');
+
+      if (!quoteItems.length) {
+        list.innerHTML = '<p class="quote-empty">Add services using the cards above.</p>';
+        totalsEl.style.display = 'none';
+        countEl.textContent = '0 services added';
+        return;
+      }
+      countEl.textContent = quoteItems.length + ' service' + (quoteItems.length > 1 ? 's' : '') + ' added';
+
+      list.innerHTML = quoteItems.map((item, idx) => {
+        const savings = (item.baseUnitPrice * item.qty) - item.tieredTotal;
+        return '<div class="quote-item">' +
+          '<div class="qi-info">' +
+          '<p class="qi-name">' + esc(item.service) + '</p>' +
+          '<p class="qi-cat">' + esc(item.section) + ' &middot; ' + esc(item.unit) + '</p>' +
+          (savings > 1 ? '<p class="qi-saving">You save ' + inrFmt(savings) + ' with volume pricing</p>' : '') +
+          '</div>' +
+          '<div class="qi-controls">' +
+          '<button class="qty-sm-btn qi-minus" data-idx="' + idx + '" aria-label="Decrease">&#8722;</button>' +
+          '<span class="qi-qty">' + item.qty + '</span>' +
+          '<button class="qty-sm-btn qi-plus" data-idx="' + idx + '" aria-label="Increase">+</button>' +
+          '</div>' +
+          '<div class="qi-price mono">' + inrFmt(item.tieredTotal) + '</div>' +
+          '<button class="qi-remove" data-idx="' + idx + '" aria-label="Remove">&#215;</button>' +
+          '</div>';
+      }).join('');
+
+      list.querySelectorAll('.qi-minus').forEach(b => b.addEventListener('click', () => adjustQty(+b.dataset.idx, -1)));
+      list.querySelectorAll('.qi-plus').forEach(b => b.addEventListener('click', () => adjustQty(+b.dataset.idx, +1)));
+      list.querySelectorAll('.qi-remove').forEach(b => b.addEventListener('click', () => { quoteItems.splice(+b.dataset.idx, 1); renderQuoteDrawer(); }));
+
+      const subtotal = quoteItems.reduce((s, i) => s + i.tieredTotal, 0);
+      const gst = subtotal * 0.18;
+      const grand = subtotal + gst;
+      document.getElementById('quoteSubtotal').textContent = inrFmt(subtotal);
+      document.getElementById('quoteGST').textContent = inrFmt(gst);
+      document.getElementById('quoteGrand').textContent = inrFmt(grand);
+      totalsEl.style.display = 'block';
+    }
+
+    function adjustQty(idx, delta) {
+      const item = quoteItems[idx];
+      const newQty = Math.max(1, item.qty + delta);
+      const { total, effectiveUnit, tiers } = calcVolume(item.baseUnitPrice, newQty);
+      Object.assign(item, { qty: newQty, tieredTotal: total, effectiveUnit, tiers });
+      renderQuoteDrawer();
+    }
+
+    /* ── Clear / Print ── */
+    document.getElementById('clearQuoteBtn').addEventListener('click', () => { quoteItems = []; renderQuoteDrawer(); });
+
+    document.getElementById('printQuoteBtn').addEventListener('click', () => {
+      if (!quoteItems.length) { alert('Add at least one service first.'); return; }
+      const date = new Intl.DateTimeFormat('en-IN', { dateStyle: 'long' }).format(new Date());
+      const subtotal = quoteItems.reduce((s, i) => s + i.tieredTotal, 0);
+      const gst = subtotal * 0.18;
+      const grand = subtotal + gst;
+
+      const rows = quoteItems.map(item => {
+        const savings = (item.baseUnitPrice * item.qty) - item.tieredTotal;
+        const tierRows = item.tiers.length > 1 ? item.tiers.map(t =>
+          '<tr style="font-size:11px;color:#666">' +
+          '<td colspan="2" style="padding-left:28px;border:none">' +
+          'Qty ' + t.from + '-' + t.to + ': ' + (t.discountPct ? '-' + t.discountPct + '% => ' : '') + inrFmt(t.unitPrice) + '/unit x ' + t.qty +
+          '</td>' +
+          '<td colspan="3" style="border:none;text-align:right">' + inrFmt(t.subtotal) + '</td>' +
+          '</tr>').join('') : '';
+        return '<tr>' +
+          '<td>' + esc(item.section) + '</td>' +
+          '<td>' + esc(item.service) + '</td>' +
+          '<td>' + item.qty + '</td>' +
+          '<td>' + inrFmt(item.baseUnitPrice) + '</td>' +
+          '<td><strong>' + inrFmt(item.tieredTotal) + '</strong>' +
+          (savings > 1 ? ' <small style="color:#34d399">(saved ' + inrFmt(savings) + ')</small>' : '') +
+          '</td></tr>' + tierRows;
+      }).join('');
+
+      const win = window.open('', '_blank', 'width=920,height=740');
+      if (!win) { alert('Please allow pop-ups to download PDF.'); return; }
+      win.document.write('<!doctype html><html><head><meta charset="UTF-8"><title>Dzinia Quotation</title>' +
+        '<style>body{font-family:Arial,sans-serif;padding:32px;color:#111;font-size:14px}' +
+        'h2{margin:0 0 4px;font-size:22px}.meta{color:#555;margin-bottom:16px;font-size:12px}' +
+        '.vol-note{background:#f3f0ff;border:1px solid #c4b5fd;padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:16px}' +
+        'table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:9px 12px;text-align:left}' +
+        'th{background:#f5f5f5;font-weight:700;font-size:12px}' +
+        '.summary{margin-top:20px;text-align:right}.grand{font-size:18px;font-weight:700;color:#7c3aed}</style></head>' +
+        '<body><h2>Dzinia Designing Services</h2>' +
+        '<div class="meta">Quotation &middot; ' + esc(date) + ' &middot; dzinia.in &middot; Pune, India</div>' +
+        '<div class="vol-note">Volume pricing: Qty 1-10 full rate | Qty 11-20 -12% | Qty 21-30 -24% | +12% per 10 units | Max cap -50%</div>' +
+        '<table><thead><tr><th>Category</th><th>Service</th><th>Qty</th><th>Base/Unit</th><th>Total (after discount)</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table>' +
+        '<div class="summary"><p>Subtotal: ' + inrFmt(subtotal) + '</p>' +
+        '<p>GST 18%: ' + inrFmt(gst) + '</p>' +
+        '<p class="grand">Grand Total: ' + inrFmt(grand) + '</p></div>' +
+        '</body></html>');
+      win.document.close(); win.focus(); win.print();
+    });
+  </script>
+</body>
+
+</html>
